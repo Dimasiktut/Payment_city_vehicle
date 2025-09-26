@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { transactions as rawTransactions } from './services/data';
 import type { Transaction } from './types';
 import SelectInput from './components/SelectInput';
@@ -15,14 +15,21 @@ const App: React.FC = () => {
   const [selectedVehicleNumber, setSelectedVehicleNumber] = useState<string>('');
   const [history, setHistory] = useState<Transaction[]>([]);
 
+  // Разворачиваем приложение на весь экран в Telegram
+  useEffect(() => {
+    if (window.Telegram?.WebApp) {
+      const tg = window.Telegram.WebApp;
+      tg.ready();
+      tg.expand();
+    }
+  }, []);
+
   const processedTransactions: Transaction[] = useMemo(() => {
     return (rawTransactions as any[]).map((t): Transaction => {
-      const routeMatch = t.vehicleType.match(/№(.*)/);
-      const cleanRoute = routeMatch ? routeMatch[1] : t.vehicleType;
       return {
         id: String(t.id),
         dateTime: t.date_time,
-        vehicleType: cleanRoute,
+        vehicleType: t.vehicleType, // оставляем без изменений
         vehicleNumber: String(t.vehicleNumber),
         amount: String(t.amount),
         link: t.link,
@@ -32,7 +39,7 @@ const App: React.FC = () => {
 
   const vehicleTypes = useMemo(() => {
     const types = new Set(processedTransactions.map(t => t.vehicleType));
-    return Array.from(types).sort(naturalSort).map(type => ({ value: type, label: `Маршрут ${type}` }));
+    return Array.from(types).sort(naturalSort).map(type => ({ value: type, label: type }));
   }, [processedTransactions]);
 
   const vehicleNumbersForType = useMemo(() => {
@@ -89,24 +96,24 @@ const App: React.FC = () => {
             <BusIcon className="w-10 h-10 text-cyan-400" />
           </div>
           <h1 className="text-3xl font-bold tracking-tight text-slate-100">Оплата транспорта</h1>
-          <p className="text-slate-400 mt-2">Найдите платежную информацию для вашего маршрута.</p>
+          <p className="text-slate-400 mt-2">Найдите платежную информацию для вашего транспорта.</p>
         </header>
 
         <main className="bg-slate-800/50 p-6 rounded-xl shadow-lg border border-slate-700 backdrop-blur-sm">
           <div className="flex flex-col space-y-6">
             <SelectInput
-              label="Маршрут"
+              label="Тип транспорта"
               value={selectedType}
               onChange={handleTypeChange}
               options={vehicleTypes}
-              placeholder="-- Выберите маршрут --"
+              placeholder="-- Выберите транспорт --"
             />
             <SelectInput
               label="Номер транспорта"
               value={selectedVehicleNumber}
               onChange={handleVehicleChange}
               options={vehicleNumbersForType}
-              placeholder={selectedType ? "-- Выберите номер --" : "-- Сначала выберите маршрут --"}
+              placeholder={selectedType ? "-- Выберите номер --" : "-- Сначала выберите транспорт --"}
               disabled={!selectedType || vehicleNumbersForType.length === 0}
             />
           </div>
@@ -127,7 +134,7 @@ const App: React.FC = () => {
                         onClick={() => handleHistoryClick(ticket)}
                         className="w-full text-left p-3 bg-slate-800/50 border border-slate-700 rounded-lg hover:bg-slate-700/50 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"
                     >
-                        <p className="font-medium text-slate-200">Маршрут {ticket.vehicleType} &middot; ТС {ticket.vehicleNumber}</p>
+                        <p className="font-medium text-slate-200">{ticket.vehicleType} &middot; ТС {ticket.vehicleNumber}</p>
                         <p className="text-sm text-slate-400">ID: {ticket.id} &middot; {ticket.amount} ₽ &middot; {new Date(ticket.dateTime).toLocaleString('ru-RU')}</p>
                     </button>
                 ))}
@@ -139,4 +146,4 @@ const App: React.FC = () => {
   );
 };
 
- export default App;
+export default App;
