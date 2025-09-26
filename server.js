@@ -10,13 +10,12 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'dist')));
 
-// Экранирование MarkdownV2
-const escapeMarkdownV2 = (text: string) => {
+// Экранирование MarkdownV2 без типов
+const escapeMarkdownV2 = (text) => {
   const specials = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!'];
   return specials.reduce((acc, char) => acc.replaceAll(char, `\\${char}`), text);
 };
 
-// API для отправки сообщения
 app.post('/api/sendMessage', async (req, res) => {
   const { chatId, text } = req.body;
   const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -39,13 +38,12 @@ app.post('/api/sendMessage', async (req, res) => {
     if (!data.ok) return res.status(400).json(data);
 
     res.json({ success: true });
-  } catch (err: any) {
+  } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error', message: err.message });
   }
 });
 
-// Отдаём React-приложение
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
