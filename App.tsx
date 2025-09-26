@@ -7,72 +7,25 @@ import { BusIcon, HistoryIcon } from './components/icons';
 
 // Natural sort for alphanumeric strings (e.g., '10A', '2', '10')
 const naturalSort = (a: string, b: string) => {
-    return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
 };
 
-// --- ИНФОРМАЦИЯ О БЕЗОПАСНОСТИ ---
-// Прямая отправка сообщений из фронтенд-кода (браузера) небезопасна,
-// так как ваш токен бота будет виден всем пользователям.
-//
-// Я изменил код так, чтобы он отправлял запрос на ваш бэкенд-сервер
-// по адресу '/api/sendMessage'. Вам необходимо самостоятельно
-// реализовать этот эндпоинт на вашем сервере.
-//
-// Пример реализации на Node.js + Express:
-//
-// const express = require('express');
-// const fetch = require('node-fetch'); // Установите: npm install node-fetch
-// const app = express();
-// app.use(express.json());
-//
-// app.post('/api/sendMessage', async (req, res) => {
-//   const { text, chatId } = req.body;
-//   // Храните токен в переменных окружения на сервере, а не в коде!
-//   const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-//
-//   if (!BOT_TOKEN) {
-//     console.error('Telegram Bot Token is not configured on the server.');
-//     return res.status(500).send('Server configuration error');
-//   }
-//
-//   const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
-//
-//   try {
-//     const response = await fetch(url, {
-//       method: 'POST',
-//       headers: { 'Content-Type': 'application/json' },
-//       body: JSON.stringify({
-//         chat_id: chatId,
-//         text: text,
-//         parse_mode: 'MarkdownV2',
-//       }),
-//     });
-//
-//     if (!response.ok) {
-//       throw new Error('Failed to send message to Telegram');
-//     }
-//
-//     res.status(200).send('Message sent successfully');
-//   } catch (error) {
-//     console.error('Error sending message to Telegram:', error);
-//     res.status(500).send('Failed to send message');
-//   }
-// });
-//
-// app.listen(3001, () => console.log('Server running on port 3001'));
-// ------------------------------------
 const sendToTelegram = async (transaction: Transaction, chatId: string | null) => {
-    if (!chatId) {
-        console.warn('Chat ID не найден. Отправка сообщения пропущена.');
-        return;
-    }
+  console.log('📤 [Frontend] Попытка отправить сообщение в Telegram');
+  console.log('📤 [Frontend] chatId:', chatId);
+  console.log('📤 [Frontend] transaction:', transaction);
 
-    const escapeMarkdown = (text: string) => {
-        const specials = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!'];
-        return specials.reduce((acc, char) => acc.replace(new RegExp('\\' + char, 'g'), '\\' + char), text);
-    };
+  if (!chatId) {
+    console.warn('⚠️ [Frontend] Chat ID не найден. Отправка пропущена.');
+    return;
+  }
 
-    const message = `
+  const escapeMarkdown = (text: string) => {
+    const specials = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!'];
+    return specials.reduce((acc, char) => acc.replace(new RegExp('\\' + char, 'g'), '\\' + char), text);
+  };
+
+  const message = `
 *Новый билет оплачен* 🎫
 
 *Транспорт:* ${escapeMarkdown(transaction.vehicleType)}
@@ -81,31 +34,42 @@ const sendToTelegram = async (transaction: Transaction, chatId: string | null) =
 *ID транзакции:* \`${escapeMarkdown(transaction.id)}\`
 
 [Ссылка на оплату](${transaction.link})
-    `;
+  `;
 
-    // Отправляем данные на наш бэкенд, а не напрямую в Telegram
-    const url = '/api/sendMessage';
+  const url = '/api/sendMessage';
 
-    try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                chatId: chatId,
-                text: message,
-            }),
-        });
+  try {
+    console.log('📤 [Frontend] Отправляю POST-запрос на:', url);
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        chatId: chatId,
+        text: message,
+      }),
+    });
 
-        if (!response.ok) {
-            console.error('Не удалось отправить сообщение через бэкенд.');
-        }
-    } catch (error) {
-        console.error('Ошибка при отправке сообщения на бэкенд:', error);
+    console.log('📥 [Frontend] Ответ от бэкенда:', {
+      ok: response.ok,
+      status: response.status,
+      statusText: response.statusText,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ [Frontend] Бэкенд вернул ошибку:', errorText);
+      return;
     }
-};
 
+    const data = await response.json();
+    console.log('✅ [Frontend] Успешный ответ от бэкенда:', data);
+
+  } catch (error: any) {
+    console.error('💥 [Frontend] Ошибка при отправке на бэкенд:', error.message, error);
+  }
+};
 
 const App: React.FC = () => {
   const [selectedType, setSelectedType] = useState<string>('');
@@ -113,15 +77,20 @@ const App: React.FC = () => {
   const [history, setHistory] = useState<Transaction[]>([]);
   const [chatId, setChatId] = useState<string | null>(null);
 
-  // Получаем данные пользователя и разворачиваем приложение
   useEffect(() => {
     if (window.Telegram?.WebApp) {
       const tg = window.Telegram.WebApp;
       tg.ready();
       tg.expand();
       if (tg.initDataUnsafe?.user?.id) {
-        setChatId(String(tg.initDataUnsafe.user.id));
+        const id = String(tg.initDataUnsafe.user.id);
+        setChatId(id);
+        console.log('✅ [Frontend] Получен chatId из Telegram WebApp:', id);
+      } else {
+        console.warn('⚠️ [Frontend] initDataUnsafe.user.id отсутствует. Пользователь не авторизован в боте.');
       }
+    } else {
+      console.warn('⚠️ [Frontend] Telegram WebApp не доступен. Запущено не в Telegram?');
     }
   }, []);
 
@@ -130,7 +99,7 @@ const App: React.FC = () => {
       return {
         id: String(t.id),
         dateTime: t.date_time,
-        vehicleType: t.vehicleType, // оставляем без изменений
+        vehicleType: t.vehicleType,
         vehicleNumber: String(t.vehicleNumber),
         amount: String(t.amount),
         link: t.link,
@@ -164,9 +133,8 @@ const App: React.FC = () => {
   }, [selectedType, selectedVehicleNumber, processedTransactions]);
 
   const handleSaveToHistory = (transactionToSave: Transaction) => {
-    // Отправляем уведомление в Telegram текущему пользователю
     if (chatId) {
-        sendToTelegram(transactionToSave, chatId);
+      sendToTelegram(transactionToSave, chatId);
     }
 
     const transactionWithCurrentDate = {
@@ -176,7 +144,7 @@ const App: React.FC = () => {
     setHistory(prevHistory => {
       const otherItems = prevHistory.filter(item => item.id !== transactionWithCurrentDate.id);
       const newHistory = [transactionWithCurrentDate, ...otherItems];
-      return newHistory.slice(0, 5); // Keep last 5 items
+      return newHistory.slice(0, 5);
     });
   };
 
@@ -188,11 +156,11 @@ const App: React.FC = () => {
   const handleVehicleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedVehicleNumber(e.target.value);
   };
-  
+
   const handleHistoryClick = (transaction: Transaction) => {
     setSelectedType(transaction.vehicleType);
     setSelectedVehicleNumber(transaction.vehicleNumber);
-  }
+  };
 
   return (
     <div className="min-h-screen text-white flex flex-col items-center justify-center p-4 selection:bg-cyan-500/30">
@@ -234,16 +202,19 @@ const App: React.FC = () => {
               История билетов
             </h2>
             <div className="space-y-2">
-                {history.map(ticket => (
-                    <button 
-                        key={ticket.id}
-                        onClick={() => handleHistoryClick(ticket)}
-                        className="w-full text-left p-3 bg-slate-800/50 border border-slate-700 rounded-lg hover:bg-slate-700/50 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                    >
-                        <p className="font-medium text-slate-200">{ticket.vehicleType} &middot; ТС {ticket.vehicleNumber}</p>
-                        <p className="text-sm text-slate-400">ID: {ticket.id} &middot; {ticket.amount} ₽ &middot; {new Date(ticket.dateTime).toLocaleString('ru-RU')}</p>
-                    </button>
-                ))}
+              {history.map(ticket => (
+                <button
+                  key={ticket.id}
+                  onClick={() => handleHistoryClick(ticket)}
+                  className="w-full text-left p-3 bg-slate-800/50 border border-slate-700 rounded-lg hover:bg-slate-700/50 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                >
+                  <p className="font-medium text-slate-200">{ticket.vehicleType} &middot; ТС {ticket.vehicleNumber}</p>
+                  <p className="text-sm text-slate-400">
+                    ID: {ticket.id} &middot; {ticket.amount} ₽ &middot;{' '}
+                    {new Date(ticket.dateTime).toLocaleString('ru-RU')}
+                  </p>
+                </button>
+              ))}
             </div>
           </div>
         )}
