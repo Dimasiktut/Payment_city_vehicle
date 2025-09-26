@@ -1,16 +1,11 @@
-// server.js
-import express from 'express';
-import path from 'path';
-import fetch from 'node-fetch';
-import dotenv from 'dotenv';
-
-dotenv.config();
+const express = require('express');
+const path = require('path');
+const fetch = require('node-fetch');
 
 const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'dist')));
 
-// Экранирование MarkdownV2 без типов
 const escapeMarkdownV2 = (text) => {
   const specials = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!'];
   return specials.reduce((acc, char) => acc.replaceAll(char, `\\${char}`), text);
