@@ -1,56 +1,42 @@
 const express = require('express');
 const path = require('path');
 const fetch = require('node-fetch');
-const TelegramBot = require('node-telegram-bot-api');
 
 const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'dist')));
 
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-if (!BOT_TOKEN) throw new Error('TELEGRAM_BOT_TOKEN не задан!');
-
-const bot = new TelegramBot(BOT_TOKEN, { polling: true });
-
-// Сохраняем chatId пользователей в памяти (для демо)
-const chatMap = new Map();
-
-// Deep linking
-bot.onText(/\/start(?: (.+))?/, (msg, match) => {
-  const chatId = msg.chat.id;
-  const param = match ? match[1] : null;
-  console.log('Новый пользователь:', chatId, param);
-  chatMap.set(param || chatId, chatId); // связываем param с chatId
-
-  bot.sendMessage(chatId, `Привет! Теперь бот знает твой chatId: ${chatId}\nПараметр: ${param}`);
-});
-
-// API для отправки сообщений из фронтенда
 app.post('/api/sendMessage', async (req, res) => {
-  const { param, text } = req.body;
-  const chatId = chatMap.get(param);
+  const { chatId, text } = req.body;
+  const BOT_TOKEN = process.env.BOT_TOKEN;
 
-  if (!chatId) return res.status(400).json({ error: 'Пользователь не найден' });
-  if (!text) return res.status(400).json({ error: 'Отсутствует текст сообщения' });
+  if (!chatId || !text || !BOT_TOKEN) {
+    return res.status(400).json({ description: 'Недостаточно данных или BOT_TOKEN не задан' });
+  }
 
   try {
     const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text }),
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        parse_mode: 'MarkdownV2'
+      })
     });
+
     const data = await response.json();
-    res.json(data);
+    if (!response.ok) return res.status(500).json(data);
+
+    res.json({ success: true });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ description: 'Ошибка при отправке сообщения', error: err.message });
   }
 });
 
-// SPA
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, '0.0.0.0', () => console.log(`Server started on port ${PORT}`));
