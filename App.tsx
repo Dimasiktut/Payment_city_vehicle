@@ -10,6 +10,57 @@ const naturalSort = (a: string, b: string) => {
     return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
 };
 
+const sendToTelegram = async (transaction: Transaction) => {
+    // !!! ВАЖНО: Замените 'YOUR_TELEGRAM_BOT_TOKEN' и 'YOUR_TELEGRAM_CHAT_ID' на ваши данные
+    const BOT_TOKEN = 'YOUR_TELEGRAM_BOT_TOKEN';
+    const CHAT_ID = 'YOUR_TELEGRAM_CHAT_ID';
+
+    if (BOT_TOKEN === 'YOUR_TELEGRAM_BOT_TOKEN' || CHAT_ID === 'YOUR_TELEGRAM_CHAT_ID') {
+        console.warn('Telegram BOT_TOKEN или CHAT_ID не настроены. Отправка сообщения пропущена.');
+        return;
+    }
+
+    const escapeMarkdown = (text: string) => {
+        const specials = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!'];
+        return specials.reduce((acc, char) => acc.replace(new RegExp('\\' + char, 'g'), '\\' + char), text);
+    };
+
+    const message = `
+*Новый билет оплачен* 🎫
+
+*Транспорт:* ${escapeMarkdown(transaction.vehicleType)}
+*Номер ТС:* ${escapeMarkdown(transaction.vehicleNumber)}
+*Сумма:* ${escapeMarkdown(transaction.amount)} ₽
+*ID транзакции:* \`${escapeMarkdown(transaction.id)}\`
+
+[Ссылка на оплату](${transaction.link})
+    `;
+
+    const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                chat_id: CHAT_ID,
+                text: message,
+                parse_mode: 'MarkdownV2',
+            }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            console.error('Не удалось отправить сообщение в Telegram:', errorData);
+        }
+    } catch (error) {
+        console.error('Ошибка при отправке сообщения в Telegram:', error);
+    }
+};
+
+
 const App: React.FC = () => {
   const [selectedType, setSelectedType] = useState<string>('');
   const [selectedVehicleNumber, setSelectedVehicleNumber] = useState<string>('');
@@ -63,6 +114,9 @@ const App: React.FC = () => {
   }, [selectedType, selectedVehicleNumber, processedTransactions]);
 
   const handleSaveToHistory = (transactionToSave: Transaction) => {
+    // Отправляем уведомление в Telegram
+    sendToTelegram(transactionToSave);
+
     const transactionWithCurrentDate = {
       ...transactionToSave,
       dateTime: new Date().toISOString(),
