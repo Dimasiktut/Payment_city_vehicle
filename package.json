@@ -6,7 +6,6 @@
   "scripts": {
     "start": "node server.js",
     "build": "esbuild index.tsx --bundle --outfile=dist/bundle.js --platform=browser",
-    "postinstall": "node -e \"const fs = require('fs'); if (fs.existsSync('.env.example') && !fs.existsSync('.env')) { fs.copyFileSync('.env.example', '.env'); console.log('.env file created from .env.example.'); }\""
   },
   "dependencies": {
     "dotenv": "^16.4.5",
