@@ -2,8 +2,9 @@
   "name": "payment_city_vehicles",
   "version": "1.0.0",
   "scripts": {
-    "build": "esbuild index.tsx --bundle --outfile=dist/bundle.js --platform=browser",
+    "build": "esbuild index.tsx --bundle --outfile=dist/bundle.js --platform=browser && mkdir -p dist && cp public/index.html dist/index.html",
     "start": "node server.js"
+  }
   },
   "dependencies": {
     "express": "^4.18.2",
