@@ -1,23 +1,20 @@
-// Загружает переменные окружения из файла .env
-require('dotenv').config();
-
 const express = require('express');
 const fetch = require('node-fetch');
 const path = require('path');
 
 const app = express();
 
-// Middleware для парсинга JSON-тел запросов
+// Middleware для парсинга JSON
 app.use(express.json());
 
-// Обслуживание статических файлов из корневой директории
-app.use(express.static(path.join(__dirname, '')));
+// Обслуживание статических файлов (React-бандл)
+app.use(express.static(path.join(__dirname, 'dist')));
 
 // API эндпоинт для отправки сообщений в Telegram
 app.post('/api/sendMessage', async (req, res) => {
   const { text, chatId } = req.body;
 
-  // Получаем токен бота из переменных окружения для безопасности
+  // Получаем токен из Environment Variables Render
   const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
   if (!text || !chatId) {
@@ -25,7 +22,7 @@ app.post('/api/sendMessage', async (req, res) => {
   }
 
   if (!BOT_TOKEN) {
-    console.error('Токен Telegram-бота не настроен на сервере. Проверьте ваш .env файл.');
+    console.error('Токен Telegram-бота не настроен на сервере. Проверьте Environment Variables Render.');
     return res.status(500).send('Ошибка конфигурации сервера: отсутствует токен бота.');
   }
 
@@ -46,7 +43,7 @@ app.post('/api/sendMessage', async (req, res) => {
 
     if (!response.ok) {
       console.error('Ошибка API Telegram:', responseData);
-      throw new Error(`Не удалось отправить сообщение в Telegram: ${responseData.description}`);
+      throw new Error(responseData.description);
     }
 
     res.status(200).json({ success: true, message: 'Сообщение успешно отправлено' });
@@ -56,14 +53,13 @@ app.post('/api/sendMessage', async (req, res) => {
   }
 });
 
-// Все остальные GET-запросы, которые не были обработаны ранее, вернут React-приложение
+// Все остальные GET-запросы вернут React-приложение
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '', 'index.html'));
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
-
+// Запуск сервера
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Сервер запущен на порту ${PORT}`);
-  console.log('Убедитесь, что у вас есть файл .env с определенной переменной TELEGRAM_BOT_TOKEN.');
 });
