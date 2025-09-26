@@ -1,45 +1,39 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { createRoot } from 'react-dom/client';
+import React, { useState, useMemo, useEffect } from 'react';
+import { transactions as rawTransactions } from './services/data';
+import type { Transaction } from './types';
 import SelectInput from './components/SelectInput';
 import ResultCard from './components/ResultCard';
 import { TicketIcon, HistoryIcon } from './components/icons';
-import { transactions as rawTransactions } from './services/data';
-import type { Transaction } from './types';
 
 const naturalSort = (a: string, b: string) =>
   a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
 
 const App: React.FC = () => {
-  const [selectedType, setSelectedType] = useState('');
-  const [selectedVehicleNumber, setSelectedVehicleNumber] = useState('');
+  const [selectedType, setSelectedType] = useState<string>('');
+  const [selectedVehicleNumber, setSelectedVehicleNumber] = useState<string>('');
   const [history, setHistory] = useState<Transaction[]>([]);
   const [chatId, setChatId] = useState<string | null>(null);
-  const [startParam, setStartParam] = useState<string | null>(null);
 
-  // Получение chatId
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
     if (!tg) return console.warn('Telegram WebApp недоступен');
+
     tg.ready();
     tg.expand();
     const userId = tg.initDataUnsafe?.user?.id;
     if (userId) setChatId(String(userId));
-
-    const params = new URLSearchParams(window.location.search);
-    const start = params.get('start');
-    if (start) setStartParam(start);
   }, []);
 
-  const processedTransactions: Transaction[] = useMemo(() =>
-    rawTransactions.map(t => ({
+  const processedTransactions: Transaction[] = useMemo(() => {
+    return (rawTransactions as any[]).map((t): Transaction => ({
       id: String(t.id),
       dateTime: t.date_time,
       vehicleType: t.vehicleType,
       vehicleNumber: String(t.vehicleNumber),
       amount: String(t.amount),
-      link: t.link
-    }))
-  , []);
+      link: t.link,
+    }));
+  }, []);
 
   const vehicleTypes = useMemo(() => {
     const types = new Set(processedTransactions.map(t => t.vehicleType));
@@ -48,7 +42,9 @@ const App: React.FC = () => {
 
   const vehicleNumbersForType = useMemo(() => {
     if (!selectedType) return [];
-    const numbers = new Set(processedTransactions.filter(t => t.vehicleType === selectedType).map(t => t.vehicleNumber));
+    const numbers = new Set(
+      processedTransactions.filter(t => t.vehicleType === selectedType).map(t => t.vehicleNumber)
+    );
     return Array.from(numbers).sort(naturalSort).map(num => ({ value: num, label: num }));
   }, [selectedType, processedTransactions]);
 
@@ -70,12 +66,14 @@ const App: React.FC = () => {
       return specials.reduce((acc, char) => acc.split(char).join(`\\${char}`), text);
     };
 
-    const message = `*Новый билет оплачен* 🎫
+    const message = `
+*Новый билет оплачен* 🎫
 *Транспорт:* ${escapeMarkdownV2(transaction.vehicleType)}
 *Номер ТС:* ${escapeMarkdownV2(transaction.vehicleNumber)}
 *Сумма:* ${escapeMarkdownV2(transaction.amount)} ₽
 *ID транзакции:* \`${escapeMarkdownV2(transaction.id)}\`
-[Ссылка на оплату](${transaction.link})`;
+[Ссылка на оплату](${transaction.link})
+    `;
 
     try {
       const res = await fetch('/api/sendMessage', {
@@ -83,9 +81,10 @@ const App: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chatId, text: message }),
       });
+
       const data = await res.json();
       if (res.ok) alert('✅ Сообщение успешно отправлено боту!');
-      else alert('❌ Ошибка: ' + JSON.stringify(data));
+      else alert('❌ Ошибка: ' + (data.description || JSON.stringify(data)));
     } catch (err) {
       console.error(err);
       alert('❌ Ошибка при отправке сообщения');
@@ -94,8 +93,9 @@ const App: React.FC = () => {
 
   const handleSaveToHistory = (transaction: Transaction) => {
     if (chatId) handleSendToBot(transaction);
-    const transactionWithDate = { ...transaction, dateTime: new Date().toISOString() };
-    setHistory(prev => [transactionWithDate, ...prev.filter(t => t.id !== transaction.id)].slice(0, 5));
+
+    const transactionWithCurrentDate = { ...transaction, dateTime: new Date().toISOString() };
+    setHistory(prev => [transactionWithCurrentDate, ...prev.filter(t => t.id !== transaction.id)].slice(0, 5));
   };
 
   return (
@@ -105,26 +105,28 @@ const App: React.FC = () => {
           <div className="inline-flex justify-center items-center gap-4 mb-4 bg-slate-900/60 p-4 rounded-full border border-white/10 backdrop-blur-lg">
             <TicketIcon className="w-10 h-10 text-cyan-400" />
           </div>
-          <h1 className="text-3xl font-bold text-slate-100">Оплата транспорта</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-100">Оплата транспорта</h1>
           <p className="text-slate-400 mt-2">Найдите платежную информацию для вашего транспорта.</p>
         </header>
 
         <main className="bg-slate-900/60 p-6 rounded-xl shadow-lg border border-white/10 backdrop-blur-lg">
-          <SelectInput
-            label="Тип транспорта"
-            value={selectedType}
-            onChange={e => { setSelectedType(e.target.value); setSelectedVehicleNumber(''); }}
-            options={vehicleTypes}
-            placeholder="-- Выберите транспорт --"
-          />
-          <SelectInput
-            label="Номер транспорта"
-            value={selectedVehicleNumber}
-            onChange={e => setSelectedVehicleNumber(e.target.value)}
-            options={vehicleNumbersForType}
-            placeholder={selectedType ? "-- Выберите номер --" : "-- Сначала выберите транспорт --"}
-            disabled={!selectedType || vehicleNumbersForType.length === 0}
-          />
+          <div className="flex flex-col space-y-6">
+            <SelectInput
+              label="Тип транспорта"
+              value={selectedType}
+              onChange={e => { setSelectedType(e.target.value); setSelectedVehicleNumber(''); }}
+              options={vehicleTypes}
+              placeholder="-- Выберите транспорт --"
+            />
+            <SelectInput
+              label="Номер транспорта"
+              value={selectedVehicleNumber}
+              onChange={e => setSelectedVehicleNumber(e.target.value)}
+              options={vehicleNumbersForType}
+              placeholder={selectedType ? "-- Выберите номер --" : "-- Сначала выберите транспорт --"}
+              disabled={!selectedType || vehicleNumbersForType.length === 0}
+            />
+          </div>
         </main>
 
         {selectedTransaction && (
@@ -144,9 +146,9 @@ const App: React.FC = () => {
                   onClick={() => { setSelectedType(ticket.vehicleType); setSelectedVehicleNumber(ticket.vehicleNumber); }}
                   className="w-full text-left p-3 bg-slate-900/60 border border-white/10 rounded-lg hover:bg-slate-800/60 backdrop-blur-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"
                 >
-                  <p className="font-medium text-slate-200">{ticket.vehicleType} · ТС {ticket.vehicleNumber}</p>
+                  <p className="font-medium text-slate-200">{ticket.vehicleType} &middot; ТС {ticket.vehicleNumber}</p>
                   <p className="text-sm text-slate-400">
-                    ID: {ticket.id} · {ticket.amount} ₽ · {new Date(ticket.dateTime).toLocaleString('ru-RU')}
+                    ID: {ticket.id} &middot; {ticket.amount} ₽ &middot; {new Date(ticket.dateTime).toLocaleString('ru-RU')}
                   </p>
                 </button>
               ))}
@@ -158,5 +160,4 @@ const App: React.FC = () => {
   );
 };
 
-const root = createRoot(document.getElementById('root')!);
-root.render(<App />);
+export default App;
