@@ -9,14 +9,14 @@ interface ResultCardProps {
 
 const ResultCard: React.FC<ResultCardProps> = ({ transaction, onSave }) => {
   return (
-    <div className="w-full max-w-md bg-slate-800/80 backdrop-blur-sm rounded-xl shadow-2xl p-6 border border-slate-700 mt-8 animate-fade-in">
+    <div className="w-full max-w-md bg-slate-900/60 backdrop-blur-lg rounded-xl shadow-2xl p-6 border border-white/10 mt-8 animate-fade-in">
       <div className="flex flex-col space-y-4">
         <div>
           <h3 className="text-sm font-medium text-slate-400">Сумма к оплате</h3>
           <p className="text-4xl font-bold text-white tracking-tight">{transaction.amount} ₽</p>
           <p className="text-xs text-slate-500 mt-1">ID: {transaction.id}</p>
         </div>
-        <div className="border-t border-slate-700 pt-4">
+        <div className="border-t border-white/10 pt-4">
           <a
             href={transaction.link}
             target="_blank"
