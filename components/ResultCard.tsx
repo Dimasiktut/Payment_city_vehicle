@@ -4,9 +4,10 @@ import { LinkIcon } from './icons';
 
 interface ResultCardProps {
   transaction: Transaction;
+  onSave: (transaction: Transaction) => void;
 }
 
-const ResultCard: React.FC<ResultCardProps> = ({ transaction }) => {
+const ResultCard: React.FC<ResultCardProps> = ({ transaction, onSave }) => {
   return (
     <div className="w-full max-w-md bg-slate-800/80 backdrop-blur-sm rounded-xl shadow-2xl p-6 border border-slate-700 mt-8 animate-fade-in">
       <div className="flex flex-col space-y-4">
@@ -19,6 +20,7 @@ const ResultCard: React.FC<ResultCardProps> = ({ transaction }) => {
             href={transaction.link}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() => onSave(transaction)}
             className="flex items-center justify-center w-full px-4 py-3 bg-cyan-600 text-white font-semibold rounded-lg hover:bg-cyan-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-cyan-500 transition-colors duration-200 shadow-lg shadow-cyan-600/20"
           >
             <LinkIcon className="w-5 h-5 mr-2" />

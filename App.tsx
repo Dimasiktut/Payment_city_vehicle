@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { transactions as rawTransactions } from './services/data';
 import type { Transaction } from './types';
 import SelectInput from './components/SelectInput';
@@ -55,15 +55,17 @@ const App: React.FC = () => {
     return candidates[0];
   }, [selectedType, selectedVehicleNumber, processedTransactions]);
 
-  useEffect(() => {
-    if (selectedTransaction) {
-      setHistory(prevHistory => {
-        const otherItems = prevHistory.filter(item => item.id !== selectedTransaction.id);
-        const newHistory = [selectedTransaction, ...otherItems];
-        return newHistory.slice(0, 5); // Keep last 5 items
-      });
-    }
-  }, [selectedTransaction]);
+  const handleSaveToHistory = (transactionToSave: Transaction) => {
+    const transactionWithCurrentDate = {
+      ...transactionToSave,
+      dateTime: new Date().toISOString(),
+    };
+    setHistory(prevHistory => {
+      const otherItems = prevHistory.filter(item => item.id !== transactionWithCurrentDate.id);
+      const newHistory = [transactionWithCurrentDate, ...otherItems];
+      return newHistory.slice(0, 5); // Keep last 5 items
+    });
+  };
 
   const handleTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedType(e.target.value);
@@ -110,7 +112,7 @@ const App: React.FC = () => {
           </div>
         </main>
 
-        {selectedTransaction && <ResultCard transaction={selectedTransaction} />}
+        {selectedTransaction && <ResultCard transaction={selectedTransaction} onSave={handleSaveToHistory} />}
 
         {history.length > 0 && (
           <div className="w-full max-w-md mt-8">
@@ -126,7 +128,7 @@ const App: React.FC = () => {
                         className="w-full text-left p-3 bg-slate-800/50 border border-slate-700 rounded-lg hover:bg-slate-700/50 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"
                     >
                         <p className="font-medium text-slate-200">Маршрут {ticket.vehicleType} &middot; ТС {ticket.vehicleNumber}</p>
-                        <p className="text-sm text-slate-400">{ticket.amount} ₽ &middot; {new Date(ticket.dateTime).toLocaleString('ru-RU')}</p>
+                        <p className="text-sm text-slate-400">ID: {ticket.id} &middot; {ticket.amount} ₽ &middot; {new Date(ticket.dateTime).toLocaleString('ru-RU')}</p>
                     </button>
                 ))}
             </div>
