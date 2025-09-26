@@ -10,13 +10,10 @@ const naturalSort = (a: string, b: string) => {
   return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
 };
 
+// Отправка сообщения в Telegram через WebApp
 const sendToTelegram = async (transaction: Transaction, chatId: string | null) => {
-  console.log('📤 [Frontend] Попытка отправить сообщение в Telegram');
-  console.log('📤 [Frontend] chatId:', chatId);
-  console.log('📤 [Frontend] transaction:', transaction);
-
   if (!chatId) {
-    console.warn('⚠️ [Frontend] Chat ID не найден. Отправка пропущена.');
+    console.warn('⚠️ Chat ID отсутствует. Сообщение не отправлено.');
     return;
   }
 
@@ -36,38 +33,32 @@ const sendToTelegram = async (transaction: Transaction, chatId: string | null) =
 [Ссылка на оплату](${transaction.link})
   `;
 
-  const url = '/api/sendMessage';
-
   try {
-    console.log('📤 [Frontend] Отправляю POST-запрос на:', url);
-    const response = await fetch(url, {
+    console.log('📤 Отправка сообщения в Telegram WebApp...');
+    const response = await fetch('/api/sendMessage', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        chatId: chatId,
-        text: message,
-      }),
-    });
-
-    console.log('📥 [Frontend] Ответ от бэкенда:', {
-      ok: response.ok,
-      status: response.status,
-      statusText: response.statusText,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chatId, text: message })
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('❌ [Frontend] Бэкенд вернул ошибку:', errorText);
+      if (errorText.includes('CHANNEL_PRIVATE')) {
+        alert('⚠️ Невозможно отправить сообщение: приватный канал. Проверьте доступ.');
+        console.warn('Попытка отправки в приватный канал. Доступ запрещён.');
+      } else {
+        console.error('❌ Ошибка при отправке сообщения:', errorText);
+        alert('❌ Ошибка при отправке сообщения. Попробуйте позже.');
+      }
       return;
     }
 
     const data = await response.json();
-    console.log('✅ [Frontend] Успешный ответ от бэкенда:', data);
+    console.log('✅ Сообщение успешно отправлено:', data);
 
-  } catch (error: any) {
-    console.error('💥 [Frontend] Ошибка при отправке на бэкенд:', error.message, error);
+  } catch (err: any) {
+    console.error('💥 Ошибка при отправке сообщения:', err.message);
+    alert('❌ Ошибка отправки сообщения. Попробуйте позже.');
   }
 };
 
@@ -77,34 +68,36 @@ const App: React.FC = () => {
   const [history, setHistory] = useState<Transaction[]>([]);
   const [chatId, setChatId] = useState<string | null>(null);
 
+  // Инициализация Telegram WebApp
   useEffect(() => {
-    if (window.Telegram?.WebApp) {
-      const tg = window.Telegram.WebApp;
-      tg.ready();
-      tg.expand();
-      if (tg.initDataUnsafe?.user?.id) {
-        const id = String(tg.initDataUnsafe.user.id);
-        setChatId(id);
-        console.log('✅ [Frontend] Получен chatId из Telegram WebApp:', id);
-      } else {
-        console.warn('⚠️ [Frontend] initDataUnsafe.user.id отсутствует. Пользователь не авторизован в боте.');
-      }
+    const tg = window.Telegram?.WebApp;
+    if (!tg) {
+      console.warn('⚠️ Telegram WebApp не доступен. Функция отправки сообщений будет отключена.');
+      return;
+    }
+
+    tg.ready();
+    tg.expand();
+
+    const userId = tg.initDataUnsafe?.user?.id;
+    if (userId) {
+      setChatId(String(userId));
+      console.log('✅ chatId получен:', userId);
     } else {
-      console.warn('⚠️ [Frontend] Telegram WebApp не доступен. Запущено не в Telegram?');
+      console.warn('⚠️ Пользователь не авторизован в боте. chatId отсутствует.');
     }
   }, []);
 
+  // Обработка исходных транзакций
   const processedTransactions: Transaction[] = useMemo(() => {
-    return (rawTransactions as any[]).map((t): Transaction => {
-      return {
-        id: String(t.id),
-        dateTime: t.date_time,
-        vehicleType: t.vehicleType,
-        vehicleNumber: String(t.vehicleNumber),
-        amount: String(t.amount),
-        link: t.link,
-      };
-    });
+    return (rawTransactions as any[]).map((t): Transaction => ({
+      id: String(t.id),
+      dateTime: t.date_time,
+      vehicleType: t.vehicleType,
+      vehicleNumber: String(t.vehicleNumber),
+      amount: String(t.amount),
+      link: t.link,
+    }));
   }, []);
 
   const vehicleTypes = useMemo(() => {
@@ -132,6 +125,7 @@ const App: React.FC = () => {
     return candidates[0];
   }, [selectedType, selectedVehicleNumber, processedTransactions]);
 
+  // Сохранение истории и отправка сообщения
   const handleSaveToHistory = (transactionToSave: Transaction) => {
     if (chatId) {
       sendToTelegram(transactionToSave, chatId);
@@ -141,6 +135,7 @@ const App: React.FC = () => {
       ...transactionToSave,
       dateTime: new Date().toISOString(),
     };
+
     setHistory(prevHistory => {
       const otherItems = prevHistory.filter(item => item.id !== transactionWithCurrentDate.id);
       const newHistory = [transactionWithCurrentDate, ...otherItems];
