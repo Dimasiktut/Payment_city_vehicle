@@ -5,62 +5,8 @@ import SelectInput from './components/SelectInput';
 import ResultCard from './components/ResultCard';
 import { BusIcon, HistoryIcon } from './components/icons';
 
-// Natural sort for alphanumeric strings (e.g., '10A', '2', '10')
-const naturalSort = (a: string, b: string) => {
-  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
-};
-
-// Отправка сообщения в Telegram через WebApp
-const sendToTelegram = async (transaction: Transaction, chatId: string | null) => {
-  if (!chatId) {
-    console.warn('⚠️ Chat ID отсутствует. Сообщение не отправлено.');
-    return;
-  }
-
-  const escapeMarkdown = (text: string) => {
-    const specials = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!'];
-    return specials.reduce((acc, char) => acc.replace(new RegExp('\\' + char, 'g'), '\\' + char), text);
-  };
-
-  const message = `
-*Новый билет оплачен* 🎫
-
-*Транспорт:* ${escapeMarkdown(transaction.vehicleType)}
-*Номер ТС:* ${escapeMarkdown(transaction.vehicleNumber)}
-*Сумма:* ${escapeMarkdown(transaction.amount)} ₽
-*ID транзакции:* \`${escapeMarkdown(transaction.id)}\`
-
-[Ссылка на оплату](${transaction.link})
-  `;
-
-  try {
-    console.log('📤 Отправка сообщения в Telegram WebApp...');
-    const response = await fetch('/api/sendMessage', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chatId, text: message })
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      if (errorText.includes('CHANNEL_PRIVATE')) {
-        alert('⚠️ Невозможно отправить сообщение: приватный канал. Проверьте доступ.');
-        console.warn('Попытка отправки в приватный канал. Доступ запрещён.');
-      } else {
-        console.error('❌ Ошибка при отправке сообщения:', errorText);
-        alert('❌ Ошибка при отправке сообщения. Попробуйте позже.');
-      }
-      return;
-    }
-
-    const data = await response.json();
-    console.log('✅ Сообщение успешно отправлено:', data);
-
-  } catch (err: any) {
-    console.error('💥 Ошибка при отправке сообщения:', err.message);
-    alert('❌ Ошибка отправки сообщения. Попробуйте позже.');
-  }
-};
+const naturalSort = (a: string, b: string) =>
+  a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
 
 const App: React.FC = () => {
   const [selectedType, setSelectedType] = useState<string>('');
@@ -68,27 +14,17 @@ const App: React.FC = () => {
   const [history, setHistory] = useState<Transaction[]>([]);
   const [chatId, setChatId] = useState<string | null>(null);
 
-  // Инициализация Telegram WebApp
+  // Получаем chatId из Telegram WebApp
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
-    if (!tg) {
-      console.warn('⚠️ Telegram WebApp не доступен. Функция отправки сообщений будет отключена.');
-      return;
-    }
+    if (!tg) return console.warn('Telegram WebApp недоступен');
 
     tg.ready();
     tg.expand();
-
     const userId = tg.initDataUnsafe?.user?.id;
-    if (userId) {
-      setChatId(String(userId));
-      console.log('✅ chatId получен:', userId);
-    } else {
-      console.warn('⚠️ Пользователь не авторизован в боте. chatId отсутствует.');
-    }
+    if (userId) setChatId(String(userId));
   }, []);
 
-  // Обработка исходных транзакций
   const processedTransactions: Transaction[] = useMemo(() => {
     return (rawTransactions as any[]).map((t): Transaction => ({
       id: String(t.id),
@@ -108,9 +44,7 @@ const App: React.FC = () => {
   const vehicleNumbersForType = useMemo(() => {
     if (!selectedType) return [];
     const numbers = new Set(
-      processedTransactions
-        .filter(t => t.vehicleType === selectedType)
-        .map(t => t.vehicleNumber)
+      processedTransactions.filter(t => t.vehicleType === selectedType).map(t => t.vehicleNumber)
     );
     return Array.from(numbers).sort(naturalSort).map(num => ({ value: num, label: num }));
   }, [selectedType, processedTransactions]);
@@ -120,41 +54,50 @@ const App: React.FC = () => {
     const candidates = processedTransactions.filter(
       t => t.vehicleType === selectedType && t.vehicleNumber === selectedVehicleNumber
     );
-    if (candidates.length === 0) return null;
+    if (!candidates.length) return null;
     candidates.sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
     return candidates[0];
   }, [selectedType, selectedVehicleNumber, processedTransactions]);
 
-  // Сохранение истории и отправка сообщения
-  const handleSaveToHistory = (transactionToSave: Transaction) => {
-    if (chatId) {
-      sendToTelegram(transactionToSave, chatId);
-    }
+  // Отправка сообщения боту
+  const handleSendToBot = async (transaction: Transaction) => {
+    if (!chatId) return alert('Telegram WebApp недоступен или пользователь не авторизован');
 
-    const transactionWithCurrentDate = {
-      ...transactionToSave,
-      dateTime: new Date().toISOString(),
+    const escapeMarkdownV2 = (text: string) => {
+      const specials = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!'];
+      return specials.reduce((acc, char) => acc.replaceAll(char, `\\${char}`), text);
     };
 
-    setHistory(prevHistory => {
-      const otherItems = prevHistory.filter(item => item.id !== transactionWithCurrentDate.id);
-      const newHistory = [transactionWithCurrentDate, ...otherItems];
-      return newHistory.slice(0, 5);
-    });
+    const message = `
+*Новый билет оплачен* 🎫
+*Транспорт:* ${escapeMarkdownV2(transaction.vehicleType)}
+*Номер ТС:* ${escapeMarkdownV2(transaction.vehicleNumber)}
+*Сумма:* ${escapeMarkdownV2(transaction.amount)} ₽
+*ID транзакции:* \`${escapeMarkdownV2(transaction.id)}\`
+[Ссылка на оплату](${transaction.link})
+    `;
+
+    try {
+      const res = await fetch('/api/sendMessage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chatId, text: message }),
+      });
+
+      const data = await res.json();
+      if (res.ok) alert('✅ Сообщение успешно отправлено боту!');
+      else alert('❌ Ошибка: ' + (data.description || JSON.stringify(data)));
+    } catch (err) {
+      console.error(err);
+      alert('❌ Ошибка при отправке сообщения');
+    }
   };
 
-  const handleTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedType(e.target.value);
-    setSelectedVehicleNumber('');
-  };
+  const handleSaveToHistory = (transaction: Transaction) => {
+    if (chatId) handleSendToBot(transaction);
 
-  const handleVehicleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedVehicleNumber(e.target.value);
-  };
-
-  const handleHistoryClick = (transaction: Transaction) => {
-    setSelectedType(transaction.vehicleType);
-    setSelectedVehicleNumber(transaction.vehicleNumber);
+    const transactionWithCurrentDate = { ...transaction, dateTime: new Date().toISOString() };
+    setHistory(prev => [transactionWithCurrentDate, ...prev.filter(t => t.id !== transaction.id)].slice(0, 5));
   };
 
   return (
@@ -173,14 +116,14 @@ const App: React.FC = () => {
             <SelectInput
               label="Тип транспорта"
               value={selectedType}
-              onChange={handleTypeChange}
+              onChange={e => { setSelectedType(e.target.value); setSelectedVehicleNumber(''); }}
               options={vehicleTypes}
               placeholder="-- Выберите транспорт --"
             />
             <SelectInput
               label="Номер транспорта"
               value={selectedVehicleNumber}
-              onChange={handleVehicleChange}
+              onChange={e => setSelectedVehicleNumber(e.target.value)}
               options={vehicleNumbersForType}
               placeholder={selectedType ? "-- Выберите номер --" : "-- Сначала выберите транспорт --"}
               disabled={!selectedType || vehicleNumbersForType.length === 0}
@@ -188,7 +131,12 @@ const App: React.FC = () => {
           </div>
         </main>
 
-        {selectedTransaction && <ResultCard transaction={selectedTransaction} onSave={handleSaveToHistory} />}
+        {selectedTransaction && (
+          <ResultCard
+            transaction={selectedTransaction}
+            onSave={handleSaveToHistory}
+          />
+        )}
 
         {history.length > 0 && (
           <div className="w-full max-w-md mt-8">
@@ -200,13 +148,12 @@ const App: React.FC = () => {
               {history.map(ticket => (
                 <button
                   key={ticket.id}
-                  onClick={() => handleHistoryClick(ticket)}
+                  onClick={() => { setSelectedType(ticket.vehicleType); setSelectedVehicleNumber(ticket.vehicleNumber); }}
                   className="w-full text-left p-3 bg-slate-800/50 border border-slate-700 rounded-lg hover:bg-slate-700/50 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"
                 >
                   <p className="font-medium text-slate-200">{ticket.vehicleType} &middot; ТС {ticket.vehicleNumber}</p>
                   <p className="text-sm text-slate-400">
-                    ID: {ticket.id} &middot; {ticket.amount} ₽ &middot;{' '}
-                    {new Date(ticket.dateTime).toLocaleString('ru-RU')}
+                    ID: {ticket.id} &middot; {ticket.amount} ₽ &middot; {new Date(ticket.dateTime).toLocaleString('ru-RU')}
                   </p>
                 </button>
               ))}
