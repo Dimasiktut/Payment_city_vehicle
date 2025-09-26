@@ -1,72 +1,56 @@
-const express = require("express");
-const path = require("path");
-const fs = require("fs");
-const fetch = require("node-fetch");
+const express = require('express');
+const path = require('path');
+const fetch = require('node-fetch');
+const TelegramBot = require('node-telegram-bot-api');
 
 const app = express();
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "frontend", "dist")));
+app.use(express.static(path.join(__dirname, 'dist')));
 
-const DB_FILE = "tickets.json";
-let tickets = {};
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+if (!BOT_TOKEN) throw new Error('TELEGRAM_BOT_TOKEN не задан!');
 
-// Загружаем сохранённые билеты
-if (fs.existsSync(DB_FILE)) {
-  tickets = JSON.parse(fs.readFileSync(DB_FILE));
-}
+const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
-function saveTickets() {
-  fs.writeFileSync(DB_FILE, JSON.stringify(tickets, null, 2));
-}
+// Сохраняем chatId пользователей в памяти (для демо)
+const chatMap = new Map();
 
-// Отправка сообщения боту
-app.post("/api/sendMessage", async (req, res) => {
-  const { chatId, text } = req.body;
-  const BOT_TOKEN = process.env.BOT_TOKEN;
+// Deep linking
+bot.onText(/\/start(?: (.+))?/, (msg, match) => {
+  const chatId = msg.chat.id;
+  const param = match ? match[1] : null;
+  console.log('Новый пользователь:', chatId, param);
+  chatMap.set(param || chatId, chatId); // связываем param с chatId
 
-  if (!chatId || !text || !BOT_TOKEN) {
-    return res.status(400).json({ description: "Недостаточно данных или BOT_TOKEN не задан" });
-  }
+  bot.sendMessage(chatId, `Привет! Теперь бот знает твой chatId: ${chatId}\nПараметр: ${param}`);
+});
+
+// API для отправки сообщений из фронтенда
+app.post('/api/sendMessage', async (req, res) => {
+  const { param, text } = req.body;
+  const chatId = chatMap.get(param);
+
+  if (!chatId) return res.status(400).json({ error: 'Пользователь не найден' });
+  if (!text) return res.status(400).json({ error: 'Отсутствует текст сообщения' });
 
   try {
     const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text,
-        parse_mode: "MarkdownV2"
-      })
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text }),
     });
-
     const data = await response.json();
-    if (!response.ok) return res.status(500).json(data);
-
-    res.json({ success: true });
+    res.json(data);
   } catch (err) {
-    res.status(500).json({ description: "Ошибка при отправке сообщения", error: err.message });
+    console.error(err);
+    res.status(500).json({ error: err.message });
   }
 });
 
-// Сохраняем билет в "базу"
-app.post("/api/addTicket", (req, res) => {
-  const { chatId, ticket } = req.body;
-  if (!chatId || !ticket) {
-    return res.status(400).json({ error: "chatId и ticket обязательны" });
-  }
-
-  if (!tickets[chatId]) tickets[chatId] = [];
-  tickets[chatId].unshift(ticket);
-  if (tickets[chatId].length > 10) tickets[chatId] = tickets[chatId].slice(0, 10);
-
-  saveTickets();
-  res.json({ success: true });
+// SPA
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
-// React SPA
-app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "frontend", "dist", "index.html"));
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, "0.0.0.0", () => console.log(`✅ Server started on ${PORT}`));
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
