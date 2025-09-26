@@ -10,57 +10,6 @@ const naturalSort = (a: string, b: string) => {
     return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
 };
 
-const sendToTelegram = async (transaction: Transaction) => {
-    // !!! ВАЖНО: Замените 'YOUR_TELEGRAM_BOT_TOKEN' и 'YOUR_TELEGRAM_CHAT_ID' на ваши данные
-    const BOT_TOKEN = 'YOUR_TELEGRAM_BOT_TOKEN';
-    const CHAT_ID = 'YOUR_TELEGRAM_CHAT_ID';
-
-    if (BOT_TOKEN === 'YOUR_TELEGRAM_BOT_TOKEN' || CHAT_ID === 'YOUR_TELEGRAM_CHAT_ID') {
-        console.warn('Telegram BOT_TOKEN или CHAT_ID не настроены. Отправка сообщения пропущена.');
-        return;
-    }
-
-    const escapeMarkdown = (text: string) => {
-        const specials = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!'];
-        return specials.reduce((acc, char) => acc.replace(new RegExp('\\' + char, 'g'), '\\' + char), text);
-    };
-
-    const message = `
-*Новый билет оплачен* 🎫
-
-*Транспорт:* ${escapeMarkdown(transaction.vehicleType)}
-*Номер ТС:* ${escapeMarkdown(transaction.vehicleNumber)}
-*Сумма:* ${escapeMarkdown(transaction.amount)} ₽
-*ID транзакции:* \`${escapeMarkdown(transaction.id)}\`
-
-[Ссылка на оплату](${transaction.link})
-    `;
-
-    const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
-
-    try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                chat_id: CHAT_ID,
-                text: message,
-                parse_mode: 'MarkdownV2',
-            }),
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            console.error('Не удалось отправить сообщение в Telegram:', errorData);
-        }
-    } catch (error) {
-        console.error('Ошибка при отправке сообщения в Telegram:', error);
-    }
-};
-
-
 const App: React.FC = () => {
   const [selectedType, setSelectedType] = useState<string>('');
   const [selectedVehicleNumber, setSelectedVehicleNumber] = useState<string>('');
@@ -76,16 +25,14 @@ const App: React.FC = () => {
   }, []);
 
   const processedTransactions: Transaction[] = useMemo(() => {
-    return (rawTransactions as any[]).map((t): Transaction => {
-      return {
-        id: String(t.id),
-        dateTime: t.date_time,
-        vehicleType: t.vehicleType, // оставляем без изменений
-        vehicleNumber: String(t.vehicleNumber),
-        amount: String(t.amount),
-        link: t.link,
-      };
-    });
+    return (rawTransactions as any[]).map((t): Transaction => ({
+      id: String(t.id),
+      dateTime: t.date_time,
+      vehicleType: t.vehicleType, // оставляем как есть
+      vehicleNumber: String(t.vehicleNumber),
+      amount: String(t.amount),
+      link: t.link,
+    }));
   }, []);
 
   const vehicleTypes = useMemo(() => {
@@ -114,8 +61,18 @@ const App: React.FC = () => {
   }, [selectedType, selectedVehicleNumber, processedTransactions]);
 
   const handleSaveToHistory = (transactionToSave: Transaction) => {
-    // Отправляем уведомление в Telegram
-    sendToTelegram(transactionToSave);
+    // Отправка данных в Telegram Web App
+    if (window.Telegram?.WebApp) {
+      const tg = window.Telegram.WebApp;
+      const payload = {
+        id: transactionToSave.id,
+        vehicleType: transactionToSave.vehicleType,
+        vehicleNumber: transactionToSave.vehicleNumber,
+        amount: transactionToSave.amount,
+        link: transactionToSave.link
+      };
+      tg.sendData(JSON.stringify(payload));
+    }
 
     const transactionWithCurrentDate = {
       ...transactionToSave,
@@ -124,7 +81,7 @@ const App: React.FC = () => {
     setHistory(prevHistory => {
       const otherItems = prevHistory.filter(item => item.id !== transactionWithCurrentDate.id);
       const newHistory = [transactionWithCurrentDate, ...otherItems];
-      return newHistory.slice(0, 5); // Keep last 5 items
+      return newHistory.slice(0, 5);
     });
   };
 
@@ -173,7 +130,9 @@ const App: React.FC = () => {
           </div>
         </main>
 
-        {selectedTransaction && <ResultCard transaction={selectedTransaction} onSave={handleSaveToHistory} />}
+        {selectedTransaction && (
+          <ResultCard transaction={selectedTransaction} onSave={handleSaveToHistory} />
+        )}
 
         {history.length > 0 && (
           <div className="w-full max-w-md mt-8">
@@ -182,16 +141,16 @@ const App: React.FC = () => {
               История билетов
             </h2>
             <div className="space-y-2">
-                {history.map(ticket => (
-                    <button 
-                        key={ticket.id}
-                        onClick={() => handleHistoryClick(ticket)}
-                        className="w-full text-left p-3 bg-slate-800/50 border border-slate-700 rounded-lg hover:bg-slate-700/50 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                    >
-                        <p className="font-medium text-slate-200">{ticket.vehicleType} &middot; ТС {ticket.vehicleNumber}</p>
-                        <p className="text-sm text-slate-400">ID: {ticket.id} &middot; {ticket.amount} ₽ &middot; {new Date(ticket.dateTime).toLocaleString('ru-RU')}</p>
-                    </button>
-                ))}
+              {history.map(ticket => (
+                <button 
+                  key={ticket.id}
+                  onClick={() => handleHistoryClick(ticket)}
+                  className="w-full text-left p-3 bg-slate-800/50 border border-slate-700 rounded-lg hover:bg-slate-700/50 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                >
+                  <p className="font-medium text-slate-200">{ticket.vehicleType} &middot; ТС {ticket.vehicleNumber}</p>
+                  <p className="text-sm text-slate-400">ID: {ticket.id} &middot; {ticket.amount} ₽ &middot; {new Date(ticket.dateTime).toLocaleString('ru-RU')}</p>
+                </button>
+              ))}
             </div>
           </div>
         )}
