@@ -31,4 +31,26 @@ app.post('/api/sendMessage', async (req, res) => {
   const chatId = chatMap.get(param);
 
   if (!chatId) return res.status(400).json({ error: 'Пользователь не найден' });
-  if (!text) return res.status(400).json({ error: 'Отсутствует текст сообщения' }
+  if (!text) return res.status(400).json({ error: 'Отсутствует текст сообщения' });
+
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text }),
+    });
+    const data = await response.json();
+    res.json(data);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// SPA
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+});
+
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
