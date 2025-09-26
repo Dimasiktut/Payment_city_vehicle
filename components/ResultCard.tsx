@@ -14,6 +14,7 @@ const ResultCard: React.FC<ResultCardProps> = ({ transaction, onSave }) => {
         <div>
           <h3 className="text-sm font-medium text-slate-400">Сумма к оплате</h3>
           <p className="text-4xl font-bold text-white tracking-tight">{transaction.amount} ₽</p>
+          <p className="text-xs text-slate-500 mt-1">ID: {transaction.id}</p>
         </div>
         <div className="border-t border-slate-700 pt-4">
           <a
