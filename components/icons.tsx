@@ -1,8 +1,8 @@
 import React from 'react';
 
-export const BusIcon = (props: React.SVGProps<SVGSVGElement>) => (
+export const TicketIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 8.25h13.5m-13.5 7.5h13.5m-1.5-15l-1.5 3-1.5-3m4.5 0l-1.5 3-1.5-3M5.25 3v18a2.25 2.25 0 002.25 2.25h9a2.25 2.25 0 002.25-2.25V3M3.75 9h16.5M3.75 15h16.5" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 6v.75m0 3v.75m0 3v.75m0 3V18m-9 1.5h5.25m-5.25 0h5.25m-5.25 0h5.25m-5.25 0h5.25M3 13.5v-2.25A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v2.25m-18 0a2.25 2.25 0 002.25 2.25h13.5A2.25 2.25 0 0021 13.5m-18 0h18" />
     </svg>
 );
 
