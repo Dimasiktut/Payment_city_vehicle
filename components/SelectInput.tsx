@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 interface SelectInputProps {
@@ -22,7 +21,7 @@ const SelectInput: React.FC<SelectInputProps> = ({ label, value, onChange, optio
           value={value}
           onChange={onChange}
           disabled={disabled}
-          className="w-full pl-3 pr-10 py-2.5 text-base text-white bg-slate-800 border border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 appearance-none disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full pl-3 pr-10 py-2.5 text-base text-white bg-slate-800/50 backdrop-blur-sm border border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 appearance-none disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
         >
           <option value="" disabled>
             {placeholder}
