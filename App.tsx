@@ -3,7 +3,7 @@ import { transactions as rawTransactions } from './services/data';
 import type { Transaction } from './types';
 import SelectInput from './components/SelectInput';
 import ResultCard from './components/ResultCard';
-import { BusIcon, HistoryIcon } from './components/icons';
+import { TicketIcon, HistoryIcon } from './components/icons';
 
 const naturalSort = (a: string, b: string) =>
   a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
@@ -65,7 +65,8 @@ const App: React.FC = () => {
 
     const escapeMarkdownV2 = (text: string) => {
       const specials = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!'];
-      return specials.reduce((acc, char) => acc.replaceAll(char, `\\${char}`), text);
+      // Fix: Replace `replaceAll` with `split` and `join` for wider compatibility.
+      return specials.reduce((acc, char) => acc.split(char).join(`\\${char}`), text);
     };
 
     const message = `
@@ -104,14 +105,14 @@ const App: React.FC = () => {
     <div className="min-h-screen text-white flex flex-col items-center justify-center p-4 selection:bg-cyan-500/30">
       <div className="w-full max-w-md mx-auto">
         <header className="text-center mb-8">
-          <div className="inline-flex justify-center items-center gap-4 mb-4 bg-slate-800/50 p-4 rounded-full border border-slate-700">
-            <BusIcon className="w-10 h-10 text-cyan-400" />
+          <div className="inline-flex justify-center items-center gap-4 mb-4 bg-slate-900/60 p-4 rounded-full border border-white/10 backdrop-blur-lg">
+            <TicketIcon className="w-10 h-10 text-cyan-400" />
           </div>
           <h1 className="text-3xl font-bold tracking-tight text-slate-100">Оплата транспорта</h1>
           <p className="text-slate-400 mt-2">Найдите платежную информацию для вашего транспорта.</p>
         </header>
 
-        <main className="bg-slate-800/50 p-6 rounded-xl shadow-lg border border-slate-700 backdrop-blur-sm">
+        <main className="bg-slate-900/60 p-6 rounded-xl shadow-lg border border-white/10 backdrop-blur-lg">
           <div className="flex flex-col space-y-6">
             <SelectInput
               label="Тип транспорта"
@@ -149,7 +150,7 @@ const App: React.FC = () => {
                 <button
                   key={ticket.id}
                   onClick={() => { setSelectedType(ticket.vehicleType); setSelectedVehicleNumber(ticket.vehicleNumber); }}
-                  className="w-full text-left p-3 bg-slate-800/50 border border-slate-700 rounded-lg hover:bg-slate-700/50 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                  className="w-full text-left p-3 bg-slate-900/60 border border-white/10 rounded-lg hover:bg-slate-800/60 backdrop-blur-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"
                 >
                   <p className="font-medium text-slate-200">{ticket.vehicleType} &middot; ТС {ticket.vehicleNumber}</p>
                   <p className="text-sm text-slate-400">
