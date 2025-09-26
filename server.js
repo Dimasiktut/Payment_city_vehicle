@@ -9,8 +9,7 @@ app.post('/api/sendMessage', async (req, res) => {
   const { text, chatId } = req.body;
   const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
-  // 🔍 Логируем входящий запрос
-  console.log('📨 Получен запрос на отправку сообщения:', { chatId, hasText: !!text });
+  console.log('📨 Получен запрос на отправку:', { chatId });
 
   if (!text || !chatId) {
     console.error('❌ Ошибка: отсутствует text или chatId');
@@ -18,12 +17,12 @@ app.post('/api/sendMessage', async (req, res) => {
   }
 
   if (!BOT_TOKEN) {
-    console.error('❌ Ошибка: TELEGRAM_BOT_TOKEN не задан в переменных окружения!');
+    console.error('❌ Ошибка: TELEGRAM_BOT_TOKEN не задан!');
     return res.status(500).json({ error: 'Telegram bot token not configured' });
   }
 
   try {
-    // ✅ ПРАВИЛЬНЫЙ URL — без пробелов!
+    // ✅ ПРАВИЛЬНЫЙ URL — БЕЗ ПРОБЕЛОВ!
     const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
 
     const response = await fetch(url, {
@@ -37,28 +36,19 @@ app.post('/api/sendMessage', async (req, res) => {
     });
 
     const data = await response.json();
-
-    // 📤 Логируем ответ от Telegram
-    console.log('📤 Ответ от Telegram API:', {
-      ok: response.ok,
-      status: response.status,
-      data: data,
-    });
+    console.log('📤 Ответ от Telegram:', data);
 
     if (!response.ok) {
-      console.error('❌ Telegram API вернул ошибку:', data.description || data);
-      return res.status(500).json({
-        error: 'Failed to send message via Telegram',
-        details: data.description || 'Unknown error',
-      });
+      console.error('❌ Ошибка Telegram API:', data.description || data);
+      return res.status(500).json({ error: 'Failed to send message', details: data.description });
     }
 
-    console.log('✅ Сообщение успешно отправлено в Telegram!');
+    console.log('✅ Сообщение успешно отправлено!');
     res.json({ success: true });
 
   } catch (error) {
-    console.error('💥 Критическая ошибка при отправке сообщения:', error.message);
-    res.status(500).json({ error: 'Internal server error', message: error.message });
+    console.error('💥 Ошибка при отправке:', error.message);
+    res.status(500).json({ error: 'Internal error', message: error.message });
   }
 });
 
